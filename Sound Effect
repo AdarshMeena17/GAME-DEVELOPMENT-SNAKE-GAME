@@ -1,0 +1,130 @@
+#include <SFML/Graphics.hpp>
+#include <SFML/Audio.hpp>
+#include <vector>
+#include <cstdlib>
+#include <ctime>
+#include <string>
+
+using namespace sf;
+using namespace std;
+
+const int WIDTH = 600;
+const int HEIGHT = 800;
+const int PLAYER_SIZE = 50;
+const int BLOCK_SIZE = 50;
+
+struct Block {
+    RectangleShape shape;
+    float speed;
+};
+
+int main() {
+    srand(static_cast<unsigned>(time(0)));
+
+    RenderWindow window(VideoMode(WIDTH, HEIGHT), "Block Dodger");
+    window.setFramerateLimit(60);
+    
+    Font font;
+    if (!font.loadFromFile("arial.ttf")) return -1;
+
+
+    SoundBuffer dodgeBuffer, crashBuffer;
+    if (!dodgeBuffer.loadFromFile("dodge.wav") || !crashBuffer.loadFromFile("crash.wav")) return -1;
+    Sound dodgeSound(dodgeBuffer);
+    Sound crashSound(crashBuffer);
+
+ 
+    RectangleShape player(Vector2f(PLAYER_SIZE, PLAYER_SIZE));
+    player.setFillColor(Color::Green);
+    player.setPosition(WIDTH / 2 - PLAYER_SIZE / 2, HEIGHT - PLAYER_SIZE - 10);
+
+   
+    vector<Block> blocks;
+    float blockSpawnTimer = 0.0f;
+    float spawnDelay = 1.0f;
+    float blockSpeed = 4.0f;
+
+  
+    int score = 0;
+    Clock gameClock;
+    Clock difficultyTimer;
+
+    bool gameOver = false;
+
+    while (window.isOpen()) {
+        Event event;
+        while (window.pollEvent(event)) {
+            if (event.type == Event::Closed) window.close();
+        }
+
+        if (!gameOver) {
+           
+            if (Keyboard::isKeyPressed(Keyboard::Left) && player.getPosition().x > 0)
+                player.move(-7.0f, 0);
+            if (Keyboard::isKeyPressed(Keyboard::Right) && player.getPosition().x + PLAYER_SIZE < WIDTH)
+                player.move(7.0f, 0);
+
+          
+            blockSpawnTimer += 0.016f;
+            if (blockSpawnTimer >= spawnDelay) {
+                blockSpawnTimer = 0.0f;
+                Block b;
+                b.shape = RectangleShape(Vector2f(BLOCK_SIZE, BLOCK_SIZE));
+                b.shape.setFillColor(Color::Red);
+                b.shape.setPosition(rand() % (WIDTH - BLOCK_SIZE), -BLOCK_SIZE);
+                b.speed = blockSpeed;
+                blocks.push_back(b);
+            }
+
+         
+            for (size_t i = 0; i < blocks.size(); ++i) {
+                blocks[i].shape.move(0, blocks[i].speed);
+
+              
+                if (blocks[i].shape.getGlobalBounds().intersects(player.getGlobalBounds())) {
+                    crashSound.play();
+                    gameOver = true;
+                }
+
+                if (blocks[i].shape.getPosition().y > HEIGHT) {
+                    blocks.erase(blocks.begin() + i);
+                    score++;
+                    dodgeSound.play();
+                }
+            }
+
+         
+            if (difficultyTimer.getElapsedTime().asSeconds() > 10) {
+                blockSpeed += 0.5f;
+                spawnDelay -= 0.1f;
+                if (spawnDelay < 0.2f) spawnDelay = 0.2f;
+                difficultyTimer.restart();
+            }
+        }
+
+     
+        window.clear(Color::Black);
+        window.draw(player);
+
+        for (auto& b : blocks)
+            window.draw(b.shape);
+
+      
+        Text scoreText("Score: " + to_string(score), font, 24);
+        scoreText.setPosition(10, 10);
+        scoreText.setFillColor(Color::White);
+        window.draw(scoreText);
+
+      
+        if (gameOver) {
+            Text overText("Game Over", font, 50);
+            overText.setPosition(WIDTH / 2 - 140, HEIGHT / 2 - 60);
+            overText.setFillColor(Color::Yellow);
+            window.draw(overText);
+        }
+
+        window.display();
+    }
+
+    return 0;
+}
